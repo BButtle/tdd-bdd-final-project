@@ -27,7 +27,7 @@ import os
 import logging
 import unittest
 from decimal import Decimal
-from service.models import Product, Category, db
+from service.models import Product, Category, db, DataValidationError
 from service import app
 from tests.factories import ProductFactory
 
@@ -203,6 +203,54 @@ class TestProductModel(unittest.TestCase):
         for product in found:
             self.assertEqual(product.category, category)
 
+    def test_update_with_no_id(self):
+        """It should not Update a Product with no id"""
+        product = ProductFactory()
+        product.id = None
+        self.assertRaises(DataValidationError, product.update)
+
+    def test_deserialize_missing_name(self):
+        """It should not Deserialize a Product without a name"""
+        data = {
+            "description": "A red fedora",
+            "price": "59.95",
+            "available": True,
+            "category": "CLOTHS",
+        }
+        product = Product()
+        self.assertRaises(DataValidationError, product.deserialize, data)
+
+    def test_deserialize_with_no_data(self):
+        """It should not Deserialize a Product with no data"""
+        product = Product()
+        self.assertRaises(DataValidationError, product.deserialize, None)
+
+    def test_deserialize_bad_available_type(self):
+        """It should not Deserialize a Product with bad available data"""
+        data = ProductFactory().serialize()
+        data["available"] = "true"
+        product = Product()
+        self.assertRaises(DataValidationError, product.deserialize, data)
+
+    def test_deserialize_bad_category(self):
+        """It should not Deserialize a Product with a bad category"""
+        data = ProductFactory().serialize()
+        data["category"] = "INVALID"
+        product = Product()
+        self.assertRaises(DataValidationError, product.deserialize, data)
+
+    def test_find_by_price_string(self):
+        """It should Find Products by price using a string"""
+        products = ProductFactory.create_batch(5)
+        for product in products:
+            product.create()
+
+        test_price = str(products[0].price)
+        found = Product.find_by_price(test_price)
+
+        self.assertGreaterEqual(found.count(), 1)
+        for product in found:
+            self.assertEqual(product.price, products[0].price)
     #
     # ADD YOUR TEST CASES HERE
     #
